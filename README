@@ -1,0 +1,18 @@
+# SplendIA
+
+Author:     Thomas Schaffer (loopfz@gmail.com)
+Language:   Go (https://golang.org)
+License:    MIT
+
+Splendor is an abstract set-collecting combo-oriented card game (http://www.spacecowboys.fr/splendor).
+
+Its simple nature makes it a prime candidate for simple AI fun.
+
+This project aims to provide the necessary tools to write a Splendor AI:
+    - a command-line game engine that executes external AI programs
+    - a dummy AI to test your own
+
+How to run:
+
+cd engine && go build
+./engine -player ./my_bin -player ./my_bin
