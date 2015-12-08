@@ -15,7 +15,7 @@ type Player struct {
 	Number        uint                                `json:"number"`
 	Tokens        ColorCount                          `json:"tokens"`
 	Cards         map[Color][]*Card                   `json:"cards"`
-	ReservedCards []*Card                             `json:"reserved_cards"`
+	ReservedCards map[string]*Card                    `json:"reserved_cards"`
 	Nobles        []*Noble                            `json:"nobles"`
 	NumberCards   uint                                `json:"number_cards"`
 	NumberTokens  uint                                `json:"number_tokens"`
@@ -29,7 +29,7 @@ func NewForkPlayer(bin string) *Player {
 		Program:       bin,
 		Tokens:        ColorCount{},
 		Cards:         map[Color][]*Card{},
-		ReservedCards: []*Card{},
+		ReservedCards: map[string]*Card{},
 		Nobles:        []*Noble{},
 		executor:      (*Player).ForkMove,
 	}
@@ -102,4 +102,14 @@ func (p *Player) GetCardCost(c *Card) ColorCount {
 	}
 
 	return ret
+}
+
+func (p *Player) CanGetNoble(n *Noble) bool {
+
+	for col, num := range n.Requirements {
+		if uint(len(p.Cards[col])) < num {
+			return false
+		}
+	}
+	return true
 }

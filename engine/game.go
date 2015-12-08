@@ -23,9 +23,10 @@ const (
 	TIER2 = "TIER2"
 	TIER3 = "TIER3"
 
-	BUY_CARD_ACT     = "BUY_CARD"
-	RESERVE_CARD_ACT = "RESERVE_CARD"
-	TOKENS_ACT       = "TOKENS"
+	BUY_CARD_ACT          = "BUY_CARD"
+	BUY_RESERVED_CARD_ACT = "BUY_RESERVED_CARD"
+	RESERVE_CARD_ACT      = "RESERVE_CARD"
+	TOKENS_ACT            = "TOKENS"
 
 	MAX_TOKENS     = 10
 	MAX_RESERVED   = 3
@@ -147,6 +148,7 @@ func (g *Game) InitNobles() {
 		i := rand.Intn(len(nobles))
 		n := nobles[i]
 		nobles[i] = nobles[len(nobles)-1]
+		nobles[len(nobles)-1] = nil
 		nobles = nobles[:len(nobles)-1]
 		g.Nobles = append(g.Nobles, n)
 		numNobles--
@@ -249,14 +251,17 @@ func (g *Game) RevealCard(slot string) error {
 }
 
 func (g *Game) DrawCard(deck string) *Card {
-	if len(g.Decks[deck]) == 0 {
+	d := g.Decks[deck]
+
+	if len(d) == 0 {
 		return nil
 	}
 
-	i := rand.Intn(len(g.Decks[deck]))
-	c := g.Decks[deck][i]
-	g.Decks[deck][i] = g.Decks[deck][len(g.Decks[deck])-1]
-	g.Decks[deck] = g.Decks[deck][:len(g.Decks[deck])]
+	i := rand.Intn(len(d))
+	c := d[i]
+	d[i] = d[len(d)-1]
+	d[len(d)-1] = nil
+	g.Decks[deck] = d[:len(d)-1]
 	g.DeckSizes[deck]--
 
 	return c

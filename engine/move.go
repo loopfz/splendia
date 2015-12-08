@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+
+	"github.com/satori/go.uuid"
 )
 
 type Move struct {
@@ -24,12 +26,7 @@ func (m *Move) Apply(p *Player, g *Game) error {
 	return fmt.Errorf("Invalid action '%s'", m.Action)
 }
 
-func (m *Move) BuyCard(p *Player, g *Game) error {
-
-	c, ok := g.Cards[m.Card]
-	if !ok {
-		return fmt.Errorf("Cannot buy card %s: no such card", m.Card)
-	}
+func doBuyCard(c *Card, p *Player, g *Game) error {
 
 	cost := p.GetCardCost(c)
 
@@ -41,7 +38,7 @@ func (m *Move) BuyCard(p *Player, g *Game) error {
 		if num > availToks && col != GOLD {
 			missing := num - availToks
 			if missing > availGold {
-				return fmt.Errorf("Cannot buy card %s: not enough %s tokens", m.Card, col)
+				return fmt.Errorf("not enough %s tokens", col)
 			}
 			availGold -= missing
 			goldToPay += int(missing)
@@ -82,9 +79,63 @@ PAY_LOOP:
 	p.NumberCards++
 	p.VP += c.VP
 
+	return nil
+}
+
+func CheckNobles(p *Player, g *Game) {
+
+	// TODO honor noble choice
+	for i, n := range g.Nobles {
+		if p.CanGetNoble(n) {
+			g.Nobles[i] = g.Nobles[len(g.Nobles)-1]
+			g.Nobles[len(g.Nobles)-1] = nil
+			g.Nobles = g.Nobles[:len(g.Nobles)-1]
+			p.Nobles = append(p.Nobles, n)
+			p.VP += n.VP
+			fmt.Printf("Player %d (%s) wins noble %s (%v)!\n", p.Number, p.Program, n.Name, n)
+			break
+		}
+	}
+}
+
+func (m *Move) BuyCard(p *Player, g *Game) error {
+
+	c, ok := g.Cards[m.Card]
+	if !ok {
+		return fmt.Errorf("Cannot buy card %s: no such card", m.Card)
+	}
+
+	err := doBuyCard(c, p, g)
+	if err != nil {
+		return fmt.Errorf("Cannot buy card %s: %s", m.Card, err)
+	}
+
+	g.RevealCard(m.Card)
+
 	fmt.Printf("Player %d (%s) buys card %s (%v)\n", p.Number, p.Program, m.Card, c)
 
-	// TODO check nobles requirements
+	CheckNobles(p, g)
+
+	return nil
+}
+
+func (m *Move) BuyReservedCard(p *Player, g *Game) error {
+
+	c, ok := p.ReservedCards[m.Card]
+	if !ok {
+		return fmt.Errorf("Cannot buy card %s: no such card", m.Card)
+	}
+
+	err := doBuyCard(c, p, g)
+	if err != nil {
+		return fmt.Errorf("Cannot buy reserved card %s: %s", m.Card, err)
+	}
+
+	delete(p.ReservedCards, m.Card)
+
+	fmt.Printf("Player %d (%s) buys reserved card %s (%v)\n", p.Number, p.Program, m.Card, c)
+
+	CheckNobles(p, g)
 
 	return nil
 }
@@ -107,7 +158,8 @@ func (m *Move) ReserveCard(p *Player, g *Game) error {
 	} else {
 		g.RevealCard(m.Card)
 	}
-	p.ReservedCards = append(p.ReservedCards, c)
+	p.ReservedCards[uuid.NewV4().String()] = c
+	//p.ReservedCards = append(p.ReservedCards, c)
 	g.GiveTokens(p, GOLD, 1)
 	g.DiscardExtra(m.Discard, p)
 
@@ -180,6 +232,13 @@ func DefaultMove(p *Player, g *Game) error {
 
 	for _, d := range decks {
 		err := (&Move{Card: d}).ReserveCard(p, g)
+		if err == nil {
+			return nil
+		}
+	}
+
+	for cName, _ := range p.ReservedCards {
+		err := (&Move{Card: cName}).BuyReservedCard(p, g)
 		if err == nil {
 			return nil
 		}
