@@ -28,44 +28,24 @@ func (m *Move) Apply(p *Player, g *Game) error {
 
 func doBuyCard(c *Card, p *Player, g *Game) error {
 
-	cost := p.GetCardCost(c)
+	canGet, cost := p.CanGetCard(c)
 
-	availGold := p.Tokens[GOLD]
-	goldToPay := 0
-
-	for col, num := range cost {
-		availToks := p.Tokens[col]
-		if num > availToks && col != GOLD {
-			missing := num - availToks
-			if missing > availGold {
-				return fmt.Errorf("not enough %s tokens", col)
-			}
-			availGold -= missing
-			goldToPay += int(missing)
-		}
+	if !canGet {
+		return fmt.Errorf("Not enough tokens to buy card, missing %v", cost)
 	}
 
 	totalToPay := 0
-	toPay := make(ColorCount)
-
-	// TODO honor token preferred token use
-	for col, num := range cost {
-		availToks := p.Tokens[col]
-		if availToks < num {
-			num = availToks
-		}
-		toPay[col] = num
+	for _, num := range cost {
 		totalToPay += int(num)
 	}
-	toPay[GOLD] = uint(goldToPay)
 
 PAY_LOOP:
 	for totalToPay > 0 {
-		for col, num := range toPay {
+		for col, num := range cost {
 			if num > 0 {
 				p.Tokens[col]--
 				p.NumberTokens--
-				toPay[col]--
+				cost[col]--
 				totalToPay--
 				g.Tokens[col]++
 				continue PAY_LOOP
@@ -86,7 +66,7 @@ func CheckNobles(p *Player, g *Game) {
 
 	// TODO honor noble choice
 	for i, n := range g.Nobles {
-		if p.CanGetNoble(n) {
+		if ok, _ := p.CanGetNoble(n); ok {
 			g.Nobles[i] = g.Nobles[len(g.Nobles)-1]
 			g.Nobles[len(g.Nobles)-1] = nil
 			g.Nobles = g.Nobles[:len(g.Nobles)-1]
@@ -159,7 +139,6 @@ func (m *Move) ReserveCard(p *Player, g *Game) error {
 		g.RevealCard(m.Card)
 	}
 	p.ReservedCards[uuid.NewV4().String()] = c
-	//p.ReservedCards = append(p.ReservedCards, c)
 	g.GiveTokens(p, GOLD, 1)
 	g.DiscardExtra(m.Discard, p)
 
@@ -214,17 +193,24 @@ func (m *Move) TakeTokens(p *Player, g *Game) error {
 
 func DefaultMove(p *Player, g *Game) error {
 
+	var lastColor Color
 	taken := 0
 	toTake := make(ColorCount)
 	for col, num := range g.Tokens {
 		if col != GOLD && num > 0 {
 			if taken < 3 {
 				taken++
+				lastColor = col
 				toTake[col]++
 			}
 		}
 	}
-	if taken > 0 {
+	if taken == 1 {
+		if g.Tokens[lastColor] > 1 {
+			toTake[lastColor]++
+		}
+	}
+	if p.NumberTokens < MAX_TOKENS && taken > 0 {
 		return (&Move{Tokens: toTake}).TakeTokens(p, g)
 	}
 

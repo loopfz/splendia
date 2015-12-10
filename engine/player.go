@@ -89,8 +89,9 @@ func (p *Player) ForkMove(g *Game) (*Move, error) {
 	return move, nil
 }
 
-func (p *Player) GetCardCost(c *Card) ColorCount {
-	ret := make(ColorCount)
+func (p *Player) CanGetCard(c *Card) (bool, ColorCount) {
+
+	cost := make(ColorCount)
 
 	for col, num := range c.Cost {
 		if uint(len(p.Cards[col])) >= num {
@@ -98,18 +99,48 @@ func (p *Player) GetCardCost(c *Card) ColorCount {
 		} else {
 			num -= uint(len(p.Cards[col]))
 		}
-		ret[col] = num
+		cost[col] = num
 	}
 
-	return ret
+	canGet := true
+	toPay := make(ColorCount)
+	availGold := p.Tokens[GOLD]
+
+	for col, num := range cost {
+		if num > p.Tokens[col] {
+			missing := num - p.Tokens[col]
+			if missing <= availGold {
+				availGold -= missing
+				toPay[GOLD] += missing
+				toPay[col] = p.Tokens[col]
+			} else {
+				canGet = false
+				break
+			}
+		} else {
+			toPay[col] = num
+		}
+	}
+
+	if canGet {
+		return canGet, toPay
+	}
+
+	return canGet, cost
 }
 
-func (p *Player) CanGetNoble(n *Noble) bool {
+func (p *Player) CanGetNoble(n *Noble) (bool, ColorCount) {
+
+	missingCards := make(ColorCount)
+	canGet := true
 
 	for col, num := range n.Requirements {
 		if uint(len(p.Cards[col])) < num {
-			return false
+			canGet = false
+			missing := uint(len(p.Cards[col])) - num
+			missingCards[col] = missing
 		}
 	}
-	return true
+
+	return canGet, missingCards
 }
